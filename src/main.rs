@@ -1,49 +1,61 @@
 use anyhow::Result;
 
-#[derive(Debug, PartialEq, Eq)]
-enum SubOrder {
-    forward(i32),
-    down(i32),
-    up(i32),
-}
-
 #[derive(Debug)]
-struct Sub {
-    depth: i32,
-    distance: i32,
-    aim: i32,
+struct FreqCounter {
+    counts : Vec<u32>,
+    total : u32,
 }
-
-impl From<&str> for SubOrder {
-    fn from(i: &str) -> Self {
-        let mut iter = i.split_whitespace();
-        //println!("{}", i);
-        match iter.next().unwrap() {
-            "forward" => SubOrder::forward(iter.next().expect("missing value").parse().unwrap()),
-            "down" => SubOrder::down(iter.next().expect("missing value").parse().unwrap()),
-            "up" => SubOrder::up(iter.next().expect("missing value").parse().unwrap()),
-            _ => SubOrder::forward(0),
+impl FreqCounter {
+    fn new(size : usize) -> Self {
+        let mut empty_counts = Vec::with_capacity(size);
+        for i in 0..size {
+            empty_counts.push(1);
         }
+        FreqCounter { counts: empty_counts, total: 0}
+    }
+    fn add_report(&mut self, report : Vec<u8>) -> &mut Self {
+        let mut report_iter = report.iter();
+        let mut freq_iter = self.counts.iter();
+        self.counts = report_iter.map(|bit| -> u32 {
+            match bit
+            {
+                48 => *freq_iter.next().unwrap(),
+                49 => *freq_iter.next().unwrap() + 1,
+                _ => {println!("err"); 0}
+            }
+        }).collect();
+        self.total += 1;
+        self
+    }
+    fn get_freqs(&self) -> Vec<bool> {
+        let mut gamma : u32 = 0;
+        let mut epsilon : u32 = 0;
+        let counts : Vec<bool> = self.counts.iter()
+            .map(|&x| x > self.total / 2).collect();
+        counts.iter().for_each(|&bit| {
+            gamma <<= 1;
+            epsilon <<= 1;
+            gamma ^= bit as u32;
+            epsilon ^= !bit as u32;
+            println!("{:?} {:?} {:?}", bit, gamma, epsilon);
+
+        });
+        println!("{:?} {:?}",  gamma.to_be_bytes(), epsilon.to_be_bytes());
+        gamma * epsilon
     }
 }
 
 fn main() -> Result<()>{
-    let file_contents: String = std::fs::read_to_string("inputs/day2.txt")?;
-    let orders : Vec<SubOrder> = file_contents.lines().map(|x| SubOrder::from(x)).collect();
-    let mut sub = Sub { depth: 0, distance: 0, aim: 0 };
-    orders.iter().for_each(|x| -> _ {
-            match x {
-                SubOrder::forward(d) => {
-                    sub.distance = sub.distance + d;
-                    sub.depth = sub.depth + (sub.aim * d)
-                }
-                SubOrder::down(d) => sub.aim = sub.aim + d,
-                SubOrder::up(d) => sub.aim = sub.aim - d,
-            };
-            println!("{:?}, {:?}", x, sub);
-        }
-    );
-    println!("{:?} {}",sub, sub.depth * sub.distance);
+    let file_contents: String = std::fs::read_to_string("inputs/day3.txt")?;
+    let reports : Vec<Vec<u8>> = file_contents.lines().map(|x| -> Vec<u8> {
+        x.as_bytes().to_vec()
+    }).collect();
+    let mut freq_counter = FreqCounter::new(reports.iter().nth(0).clone().unwrap().len());
+   for report in &reports {
+       freq_counter.add_report(report.to_owned());
+   }
+    println!("{:?}",freq_counter);
+    println!("{:?}",freq_counter.get_soln());
 
     Ok(())
 }
